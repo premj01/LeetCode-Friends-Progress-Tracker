@@ -1,18 +1,12 @@
-// api/server.js
-
-// 1. Import necessary packages
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 
-// 2. Initialize the Express app
 const app = express();
 
-// 3. Apply middleware
 app.use(cors());
 app.use(express.json());
 
-// 4. Define the proxy endpoint
 app.post('/api/weekly_data', async (req, res) => {
   const { username } = req.body;
 
@@ -49,5 +43,4 @@ app.post('/api/weekly_data', async (req, res) => {
   }
 });
 
-// 5. Export the app for Vercel
 module.exports = app;
