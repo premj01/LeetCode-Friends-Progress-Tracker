@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeetCode Friends Progress Tracker</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for creating the graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Custom styles to complement Tailwind */
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #1a1a1a;
+        color: #e0e0e0;
+      }
+      .card {
+        background-color: #2a2a2a;
+        border: 1px solid #3a3a3a;
+      }
+      .btn-primary {
+        background-color: #007bff;
+        transition: background-color 0.3s ease;
+      }
+      .btn-primary:hover {
+        background-color: #0056b3;
+        /* background-color: #00b33f; */
+      }
+      .btn-danger {
+        background-color: #dc3545;
+        transition: background-color 0.3s ease;
+      }
+      .btn-danger:hover {
+        background-color: #c82333;
+      }
+      .input-field {
+        background-color: #3a3a3a;
+        border: 1px solid #4a4a4a;
+        color: #e0e0e0;
+      }
+      .input-field::placeholder {
+        color: #888;
+      }
+      .input-field:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+      }
+      .friend-tag {
+        background-color: #3a3a3a;
+        border: 1px solid #4a4a4a;
+      }
+      /* UPDATED: Changed .problem-link to target the container div */
+      .problem-item {
+        transition: background-color 0.2s ease-in-out;
+      }
+      .problem-item:hover {
+        /* background-color: #007bff; */
+        background-color: rgba(0, 128, 0, 0.933);
+      }
+    </style>
+  </head>
+  <body class="p-4 sm:p-6 md:p-8">
+    <div class="max-w-7xl mx-auto">
+      <!-- Header -->
+      <header class="text-center mb-8">
+        <h1 class="text-3xl sm:text-4xl font-bold text-white">
+          LeetCode Friends Progress Tracker
+        </h1>
+        <p class="text-gray-400 mt-2">
+          Visualize the weekly coding activity of you and your friends.
+        </p>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: Controls and Friends List -->
+        <div class="lg:col-span-1 space-y-6">
+          <!-- Add Friend Card -->
+          <div class="card p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4 text-white">Add a Friend</h2>
+            <form id="add-friend-form" class="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                id="username-input"
+                placeholder="Enter LeetCode username"
+                class="input-field flex-grow p-3 rounded-md text-white"
+                required
+              />
+              <button
+                type="submit"
+                class="btn-primary text-white font-semibold py-3 px-5 rounded-md"
+              >
+                Add
+              </button>
+            </form>
+            <p id="error-message" class="text-red-400 mt-3 text-sm"></p>
+          </div>
+
+          <!-- Friends List Card -->
+          <div class="card p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4 text-white">Friends List</h2>
+            <div id="friends-list" class="space-y-3">
+              <!-- Friend items will be dynamically inserted here -->
+              <p class="text-gray-400">No friends added yet.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Progress Chart and Recent Problems -->
+        <div class="lg:col-span-2 space-y-8">
+          <div class="card p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4 text-white">
+              Weekly Progress
+            </h2>
+            <div id="chart-container" class="relative h-96">
+              <div
+                id="loading-spinner"
+                class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 rounded-lg z-10 hidden"
+              >
+                <div
+                  class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"
+                ></div>
+              </div>
+              <canvas id="progress-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Recent Problems Card (initially hidden) -->
+          <div
+            id="recent-problems-card"
+            class="card p-6 rounded-lg shadow-lg hidden"
+          >
+            <h2
+              id="recent-problems-title"
+              class="text-xl font-semibold mb-4 text-white"
+            >
+              Recent Problems Solved
+            </h2>
+            <div id="recent-problems-list" class="space-y-2">
+              <!-- List of problems will be injected here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // DOM elements
+      const addFriendForm = document.getElementById("add-friend-form");
+      const usernameInput = document.getElementById("username-input");
+      const friendsList = document.getElementById("friends-list");
+      const errorMessage = document.getElementById("error-message");
+      const loadingSpinner = document.getElementById("loading-spinner");
+      const ctx = document.getElementById("progress-chart").getContext("2d");
+      const recentProblemsCard = document.getElementById(
+        "recent-problems-card"
+      );
+      const recentProblemsTitle = document.getElementById(
+        "recent-problems-title"
+      );
+      const recentProblemsList = document.getElementById(
+        "recent-problems-list"
+      );
+
+      // State
+      let friends = [];
+      let chart;
+      let friendSubmissions = new Map();
+
+      // Colors for the chart lines
+      const chartColors = [
+        "#3498db",
+        "#e74c3c",
+        "#2ecc71",
+        "#f1c40f",
+        "#9b59b6",
+        "#1abc9c",
+        "#d35400",
+        "#34495e",
+        "#c0392b",
+        "#7f8c8d",
+      ];
+
+      // --- Initialization ---
+      document.addEventListener("DOMContentLoaded", () => {
+        loadStateFromLocalStorage();
+        renderFriendsList();
+        if (friends.length > 0) {
+          fetchAllFriendsData();
+        } else {
+          initializeChart();
+        }
+      });
+
+      // --- Local Storage ---
+      function loadStateFromLocalStorage() {
+        const storedFriends = localStorage.getItem("leetcodeFriends");
+        if (storedFriends) {
+          friends = JSON.parse(storedFriends);
+        }
+      }
+
+      function saveStateToLocalStorage() {
+        localStorage.setItem("leetcodeFriends", JSON.stringify(friends));
+      }
+
+      // --- API Fetching ---
+      async function fetchLeetCodeData(username) {
+        const API_URL = "http://localhost:3000/weekly_data";
+
+        try {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username }),
+          });
+
+          if (!response.ok)
+            throw new Error(`Network response was not ok for ${username}`);
+
+          const data = await response.json();
+          if (data.errors) throw new Error(data.errors[0].message);
+
+          friendSubmissions.set(username, data.data.recentAcSubmissionList);
+
+          return data.data.recentAcSubmissionList;
+        } catch (error) {
+          console.error(`Failed to fetch data for ${username}:`, error);
+          errorMessage.textContent = `Error fetching data. Is your local server running?`;
+          return null;
+        }
+      }
+
+      // --- Data Processing ---
+      function processSubmissionsForChart(submissions) {
+        const weeklyProgress = Array(7).fill(0);
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 6);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+
+        submissions.forEach((submission) => {
+          const submissionDate = new Date(
+            parseInt(submission.timestamp) * 1000
+          );
+          if (submissionDate >= sevenDaysAgo && submissionDate <= today) {
+            const diffTime = today.getTime() - submissionDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const dayIndex = 6 - diffDays;
+            if (dayIndex >= 0 && dayIndex < 7) {
+              weeklyProgress[dayIndex]++;
+            }
+          }
+        });
+        return weeklyProgress;
+      }
+
+      // --- Chart Rendering ---
+      function getChartLabels() {
+        const labels = [];
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(today);
+          date.setDate(today.getDate() - i);
+          labels.push(date.toLocaleString("en-US", { weekday: "short" }));
+        }
+        return labels.reverse();
+      }
+
+      function initializeChart() {
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+          type: "line",
+          data: { labels: getChartLabels(), datasets: [] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "top", labels: { color: "#e0e0e0" } },
+              title: {
+                display: true,
+                text: "Accepted Submissions in the Last 7 Days",
+                color: "#e0e0e0",
+                font: { size: 16 },
+              },
+            },
+            scales: {
+              x: { ticks: { color: "#aaa" }, grid: { color: "#444" } },
+              y: {
+                beginAtZero: true,
+                ticks: { color: "#aaa", stepSize: 1 },
+                grid: { color: "#444" },
+              },
+            },
+          },
+        });
+      }
+
+      async function updateChart() {
+        loadingSpinner.classList.remove("hidden");
+        const datasets = [];
+        const currentFriendsSet = new Set(friends);
+        for (const user of friendSubmissions.keys()) {
+          if (!currentFriendsSet.has(user)) {
+            friendSubmissions.delete(user);
+          }
+        }
+
+        for (let i = 0; i < friends.length; i++) {
+          const username = friends[i];
+          const submissions = await fetchLeetCodeData(username);
+          if (submissions) {
+            const weeklyProgress = processSubmissionsForChart(submissions);
+            datasets.push({
+              label: username,
+              data: weeklyProgress,
+              borderColor: chartColors[i % chartColors.length],
+              backgroundColor: chartColors[i % chartColors.length] + "33",
+              tension: 0.2,
+              fill: false,
+            });
+          }
+        }
+
+        if (!chart) initializeChart();
+
+        chart.data.datasets = datasets;
+        chart.update();
+        loadingSpinner.classList.add("hidden");
+      }
+
+      // --- DOM Manipulation ---
+      function renderFriendsList() {
+        friendsList.innerHTML =
+          friends.length === 0
+            ? '<p class="text-gray-400">No friends added yet.</p>'
+            : "";
+        friends.forEach((friend, index) => {
+          const friendElement = document.createElement("div");
+          friendElement.className =
+            "friend-tag flex items-center justify-between p-3 rounded-md";
+
+          const friendName = document.createElement("span");
+          friendName.textContent = friend;
+          friendName.style.color = chartColors[index % chartColors.length];
+          friendName.className = "font-semibold cursor-pointer hover:underline";
+          friendName.onclick = () => showRecentProblems(friend);
+
+          const removeButton = document.createElement("button");
+          removeButton.textContent = "Remove";
+          removeButton.className =
+            "btn-danger text-white text-xs font-bold py-1 px-3 rounded-full";
+          removeButton.onclick = (e) => {
+            e.stopPropagation();
+            removeFriend(friend);
+          };
+
+          friendElement.appendChild(friendName);
+          friendElement.appendChild(removeButton);
+          friendsList.appendChild(friendElement);
+        });
+      }
+
+      // MODIFIED: Function to display recent problems with time
+      function showRecentProblems(username) {
+        const submissions = friendSubmissions.get(username);
+        if (!submissions) return;
+
+        recentProblemsTitle.textContent = `Last 10 Unique Problems Solved by ${username}`;
+        recentProblemsList.innerHTML = "";
+
+        const uniqueProblems = [];
+        const seenTitles = new Set();
+        for (const sub of submissions) {
+          if (!seenTitles.has(sub.title)) {
+            seenTitles.add(sub.title);
+            uniqueProblems.push(sub);
+          }
+        }
+
+        const lastTen = uniqueProblems.slice(0, 10);
+
+        if (lastTen.length === 0) {
+          recentProblemsList.innerHTML =
+            '<p class="text-gray-400">No recent unique submissions found.</p>';
+        } else {
+          lastTen.forEach((problem) => {
+            // Create a container for the link and time
+            const problemItem = document.createElement("a");
+            problemItem.href = `https://leetcode.com/problems/${problem.titleSlug}/`;
+            problemItem.target = "_blank";
+            problemItem.className =
+              "problem-item flex justify-between items-center p-2 rounded-md group";
+
+            // Create the element for the problem title
+            const titleSpan = document.createElement("span");
+            titleSpan.textContent = problem.title;
+            titleSpan.className =
+              "text-gray-300 group-hover:text-white transition-colors duration-200";
+
+            // Create the time element
+            const timeSpan = document.createElement("span");
+            const submissionDate = new Date(parseInt(problem.timestamp) * 1000);
+            timeSpan.textContent = submissionDate.toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+            timeSpan.className =
+              "text-xs text-gray-400 group-hover:text-gray-200 transition-colors duration-200";
+
+            // Append title and time to the container
+            problemItem.appendChild(titleSpan);
+            problemItem.appendChild(timeSpan);
+
+            // Append the container to the list
+            recentProblemsList.appendChild(problemItem);
+          });
+        }
+
+        recentProblemsCard.classList.remove("hidden");
+      }
+
+      // --- Event Handlers and Logic ---
+      async function addFriend(username) {
+        if (friends.includes(username)) {
+          errorMessage.textContent = `${username} is already on your list.`;
+          return;
+        }
+        errorMessage.textContent = "";
+        loadingSpinner.classList.remove("hidden");
+
+        const submissions = await fetchLeetCodeData(username);
+        loadingSpinner.classList.add("hidden");
+
+        if (submissions) {
+          friends.push(username);
+          saveStateToLocalStorage();
+          renderFriendsList();
+          await updateChart();
+          usernameInput.value = "";
+        }
+      }
+
+      function removeFriend(username) {
+        friends = friends.filter((f) => f !== username);
+        friendSubmissions.delete(username);
+        saveStateToLocalStorage();
+        renderFriendsList();
+        updateChart();
+        if (recentProblemsTitle.textContent.includes(username)) {
+          recentProblemsCard.classList.add("hidden");
+        }
+      }
+
+      async function fetchAllFriendsData() {
+        await updateChart();
+      }
+
+      addFriendForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const username = usernameInput.value.trim();
+        if (username) addFriend(username);
+      });
+    </script>
+  </body>
+</html>
