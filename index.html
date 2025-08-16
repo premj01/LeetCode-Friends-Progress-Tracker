@@ -214,7 +214,8 @@
 
       // --- API Fetching ---
       async function fetchLeetCodeData(username) {
-        const API_URL = "http://localhost:3000/weekly_data";
+       // const API_URL = "http://localhost:3000/weekly_data";
+        const API_URL = "https://leet-code-friends-progress-tracker.vercel.app/api/weekly_data";
 
         try {
           const response = await fetch(API_URL, {
